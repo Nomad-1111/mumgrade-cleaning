@@ -53,9 +53,9 @@ export function HomePage() {
     <>
       <section className="relative min-h-[min(88dvh,860px)] overflow-hidden">
         <img
-          src="/brand/hero.jpg"
+          src="/brand/hero.png"
           alt="Bright, spotless modern living room with garden views"
-          className="absolute inset-0 h-full w-full object-cover object-[center_40%]"
+          className="absolute inset-0 h-full w-full object-cover object-[center_45%]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-charcoal/45 to-charcoal/25 sm:bg-gradient-to-r sm:from-charcoal/75 sm:via-charcoal/40 sm:to-charcoal/15" />
         <div className="relative mx-auto flex min-h-[min(88dvh,860px)] max-w-6xl flex-col justify-end px-4 pb-12 pt-24 sm:px-6 sm:pb-20 sm:pt-28">

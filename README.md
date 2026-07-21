@@ -21,7 +21,7 @@ Hosted on **Cloudflare Pages** with **Pages Functions (Hono)** and **D1**.
 | Sand | `#E8DFD0` | Secondary surfaces |
 | Charcoal | `#2C2C2C` | Body text |
 
-Hero image: `public/brand/hero.jpg`  
+Hero image: `public/brand/hero.png`  
 Logo: `public/brand/logo.jpg`
 
 ## Local setup
