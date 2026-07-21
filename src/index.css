@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sage: #8fa898;
+  --color-olive: #4a5d3e;
+  --color-cream: #f7f3ec;
+  --color-sand: #e8dfd0;
+  --color-charcoal: #2c2c2c;
+  --color-white: #ffffff;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    overflow-x: clip;
+  }
+
+  body {
+    @apply m-0 min-h-dvh bg-cream font-sans text-charcoal antialiased;
+    overflow-x: clip;
+  }
+
+  #root {
+    @apply min-h-dvh overflow-x-clip;
+  }
+
+  a {
+    @apply text-inherit no-underline;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .field {
+    @apply w-full min-h-11 rounded-md border border-sand bg-white px-3 py-2.5 text-base text-charcoal outline-none focus:border-sage;
+  }
+}
