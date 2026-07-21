@@ -15,6 +15,8 @@
   html {
     scroll-behavior: smooth;
     overflow-x: clip;
+    accent-color: var(--color-sage);
+    color-scheme: light;
   }
 
   body {
@@ -35,11 +37,41 @@
   select,
   textarea {
     font: inherit;
+    accent-color: var(--color-sage);
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--color-sage) 45%, white);
+    color: var(--color-charcoal);
+  }
+
+  option:checked,
+  option:hover {
+    background-color: var(--color-sage);
+    color: var(--color-white);
   }
 }
 
 @layer components {
   .field {
     @apply w-full min-h-11 rounded-md border border-sand bg-white px-3 py-2.5 text-base text-charcoal outline-none focus:border-sage;
+  }
+
+  .field:focus,
+  .field:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: 1px;
+    border-color: var(--color-sage);
+    box-shadow: none;
+  }
+
+  select.field {
+    color: var(--color-charcoal);
+    background-color: var(--color-white);
+  }
+
+  select.field:focus,
+  select.field:focus-visible {
+    outline-color: var(--color-olive);
   }
 }
