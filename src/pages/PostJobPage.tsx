@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Select } from '../components/Select'
 import { api, SERVICE_TYPES } from '../lib/api'
 
 const steps = ['Service', 'Details', 'Contact'] as const
@@ -84,19 +85,18 @@ export function PostJobPage() {
         {step === 0 && (
           <>
             <Field label="Service type">
-              <select
+              <Select
+                id="service_type"
                 required
                 value={form.service_type}
-                onChange={(e) => update('service_type', e.target.value)}
-                className="field"
-              >
-                <option value="">Select a service</option>
-                {SERVICE_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => update('service_type', value)}
+                placeholder="Select a service"
+                aria-label="Service type"
+                options={SERVICE_TYPES.map((type) => ({
+                  value: type,
+                  label: type,
+                }))}
+              />
             </Field>
             <Field label="Suburb">
               <input
@@ -193,11 +193,11 @@ function Field({
   children: ReactNode
 }) {
   return (
-    <label className="block">
+    <div className="block">
       <span className="mb-1.5 block text-sm font-medium text-charcoal">
         {label}
       </span>
       {children}
-    </label>
+    </div>
   )
 }

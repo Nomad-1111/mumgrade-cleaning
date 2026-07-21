@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Select } from '../components/Select'
 import { SERVICE_TYPES } from '../lib/api'
 
 const categories = [
@@ -51,14 +52,16 @@ export function HomePage() {
 
   return (
     <>
-      <section className="relative min-h-[min(88dvh,860px)] overflow-hidden">
-        <img
-          src="/brand/hero.png"
-          alt="Bright, spotless modern living room with garden views"
-          className="absolute inset-0 h-full w-full object-cover object-[center_45%]"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-charcoal/45 to-charcoal/25 sm:bg-gradient-to-r sm:from-charcoal/75 sm:via-charcoal/40 sm:to-charcoal/15" />
-        <div className="relative mx-auto flex min-h-[min(88dvh,860px)] max-w-6xl flex-col justify-end px-4 pb-12 pt-24 sm:px-6 sm:pb-20 sm:pt-28">
+      <section className="relative z-20 min-h-[min(88dvh,860px)]">
+        <div className="absolute inset-0 overflow-hidden">
+          <img
+            src="/brand/hero.png"
+            alt="Bright, spotless modern living room with garden views"
+            className="absolute inset-0 h-full w-full object-cover object-[center_45%]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-charcoal/45 to-charcoal/25 sm:bg-gradient-to-r sm:from-charcoal/75 sm:via-charcoal/40 sm:to-charcoal/15" />
+        </div>
+        <div className="relative z-20 mx-auto flex min-h-[min(88dvh,860px)] max-w-6xl flex-col justify-end px-4 pb-12 pt-24 sm:px-6 sm:pb-20 sm:pt-28">
           <p className="font-display text-4xl font-semibold tracking-tight text-cream sm:text-5xl md:text-7xl">
             Mum Grade
           </p>
@@ -72,24 +75,24 @@ export function HomePage() {
 
           <form
             onSubmit={onSearch}
-            className="mt-6 flex w-full max-w-2xl flex-col gap-3 rounded-lg bg-cream/95 p-3 shadow-lg shadow-charcoal/10 backdrop-blur sm:mt-8 sm:flex-row sm:items-center"
+            className="relative z-30 mt-6 flex w-full max-w-2xl flex-col gap-3 rounded-lg bg-cream/95 p-3 shadow-lg shadow-charcoal/10 backdrop-blur sm:mt-8 sm:flex-row sm:items-center"
           >
             <label className="sr-only" htmlFor="service">
               What do you need help with?
             </label>
-            <select
+            <Select
               id="service"
+              className="flex-1"
               value={service}
-              onChange={(e) => setService(e.target.value)}
-              className="field flex-1"
-            >
-              <option value="">What do you need help with?</option>
-              {SERVICE_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
+              onChange={setService}
+              menuPlacement="bottom"
+              placeholder="What do you need help with?"
+              aria-label="What do you need help with?"
+              options={SERVICE_TYPES.map((type) => ({
+                value: type,
+                label: type,
+              }))}
+            />
             <label className="sr-only" htmlFor="suburb">
               Suburb
             </label>
@@ -110,7 +113,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+      <section className="relative z-0 mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         <h2 className="font-display text-3xl font-semibold text-olive sm:text-4xl">
           How Mum Grade works
         </h2>
