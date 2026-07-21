@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:cf": "npm run build && wrangler pages dev dist --persist-to=.wrangler/state",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && cp dist/index.html dist/404.html",
     "lint": "oxlint",
     "preview": "vite preview",
     "db:migrate": "wrangler d1 migrations apply mumgrade-cleaning --local --persist-to=.wrangler/state",

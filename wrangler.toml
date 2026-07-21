@@ -5,5 +5,5 @@ pages_build_output_dir = "dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "mumgrade-cleaning"
-database_id = "00000000-0000-0000-0000-000000000001"
+database_id = "d4af78f6-7619-414c-be1a-52550395aaba"
 migrations_dir = "migrations"
