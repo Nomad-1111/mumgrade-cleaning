@@ -7,6 +7,35 @@ export type Provider = {
   phone: string
   verified: number
   created_at: string
+  status?: string
+  notes?: string
+  plan?: string
+}
+
+export type Invoice = {
+  id: string
+  provider_id: string
+  amount_cents: number
+  currency: string
+  status: string
+  description: string
+  due_at: string | null
+  paid_at: string | null
+  created_at: string
+  provider_name?: string
+}
+
+export type AdminOverview = {
+  stats: {
+    providersTotal: number
+    providersActive: number
+    providersVerified: number
+    jobsOpen: number
+    videos: number
+    invoicesUnpaid: number
+  }
+  recentProviders: Provider[]
+  recentInvoices: Invoice[]
 }
 
 export type Job = {
@@ -268,6 +297,81 @@ export const api = {
   adminDeleteTraining: (id: string) =>
     request<{ ok: boolean }>(`/api/admin/training/${id}`, {
       method: 'DELETE',
+      admin: true,
+    }),
+
+  adminOverview: () =>
+    request<AdminOverview>('/api/admin/overview', { admin: true }),
+  adminListProviders: (params?: { q?: string; status?: string }) => {
+    const search = new URLSearchParams()
+    if (params?.q) search.set('q', params.q)
+    if (params?.status) search.set('status', params.status)
+    const qs = search.toString()
+    return request<{ providers: Provider[] }>(
+      `/api/admin/providers${qs ? `?${qs}` : ''}`,
+      { admin: true },
+    )
+  },
+  adminGetProvider: (id: string) =>
+    request<{ provider: Provider; invoices: Invoice[] }>(
+      `/api/admin/providers/${id}`,
+      { admin: true },
+    ),
+  adminUpdateProvider: (
+    id: string,
+    body: {
+      name?: string
+      suburb?: string
+      bio?: string
+      email?: string
+      phone?: string
+      verified?: boolean | number
+      status?: string
+      notes?: string
+      plan?: string
+    },
+  ) =>
+    request<{ provider: Provider }>(`/api/admin/providers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+      admin: true,
+    }),
+  adminRevokeProviderSessions: (id: string) =>
+    request<{ ok: boolean }>(`/api/admin/providers/${id}/revoke-sessions`, {
+      method: 'POST',
+      body: '{}',
+      admin: true,
+    }),
+  adminListInvoices: (status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+    return request<{ invoices: Invoice[] }>(`/api/admin/invoices${qs}`, {
+      admin: true,
+    })
+  },
+  adminCreateInvoice: (body: {
+    provider_id: string
+    amount_cents: number
+    description?: string
+    due_at?: string
+    status?: string
+  }) =>
+    request<{ invoice: Invoice }>('/api/admin/invoices', {
+      method: 'POST',
+      body: JSON.stringify(body),
+      admin: true,
+    }),
+  adminUpdateInvoice: (
+    id: string,
+    body: {
+      status?: string
+      description?: string
+      amount_cents?: number
+      due_at?: string | null
+    },
+  ) =>
+    request<{ invoice: Invoice }>(`/api/admin/invoices/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
       admin: true,
     }),
 }
