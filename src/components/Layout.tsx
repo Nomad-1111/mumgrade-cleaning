@@ -55,12 +55,12 @@ export function Layout() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4">
           <Link
             to="/"
-            className="group flex min-w-0 items-center gap-2.5 sm:gap-3"
+            className="group flex min-w-0 items-center gap-1.5 sm:gap-2"
           >
             <img
-              src="/brand/logo.jpg"
+              src="/brand/logo.png"
               alt="Mum Grade Cleaning"
-              className="h-10 w-10 shrink-0 rounded-md object-cover shadow-sm ring-1 ring-sand sm:h-11 sm:w-11"
+              className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
             />
             <span className="min-w-0">
               <span className="block font-display text-xl font-semibold leading-tight tracking-tight text-olive transition-colors group-hover:text-sage sm:text-2xl">
@@ -174,11 +174,11 @@ export function Layout() {
       <footer className="border-t border-sand bg-sand/40 pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-3 sm:px-6">
           <div>
-            <Link to="/" className="inline-flex items-center gap-3">
+            <Link to="/" className="inline-flex items-center gap-1.5 sm:gap-2">
               <img
-                src="/brand/logo.jpg"
+                src="/brand/logo.png"
                 alt=""
-                className="h-12 w-12 rounded-md object-cover ring-1 ring-sand"
+                className="h-12 w-12 object-contain"
               />
               <span className="font-display text-2xl font-semibold text-olive">
                 Mum Grade

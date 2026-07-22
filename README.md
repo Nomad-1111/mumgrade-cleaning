@@ -22,7 +22,8 @@ Hosted on **Cloudflare Pages** with **Pages Functions (Hono)** and **D1**.
 | Charcoal | `#2C2C2C` | Body text |
 
 Hero image: `public/brand/hero.png`  
-Logo: `public/brand/logo.jpg`
+Logo: `public/brand/logo.png`  
+Suburb dataset: `public/data/au-suburbs.json` (~18k AU localities)
 
 ## Local setup
 
@@ -30,12 +31,14 @@ Logo: `public/brand/logo.jpg`
 npm install
 npm run db:migrate
 npm run build
-npm run dev:cf
+npm run dev:full
 ```
 
-- `npm run dev` — Vite UI only (API calls need the CF stack; Vite proxies `/api` to port `8788`).
-- `npm run dev:cf` — full local Pages + Functions + D1 (recommended for marketplace flows).
-- `npm run db:migrate` — apply D1 migrations locally (includes demo seed data).
+- `npm run dev:full` — **recommended**: Vite hot reload (UI) + Wrangler API/D1 on port `8788`.
+- `npm run dev` — Vite UI only (Find cleaners / Join / Post job need the API).
+- `npm run dev:api` — Wrangler API only (run beside `npm run dev` if you prefer two terminals).
+- `npm run dev:cf` — full Pages preview from `dist` (no Vite HMR).
+- `npm run db:migrate` — apply D1 migrations locally (includes demo seed providers).
 
 Open the URL Wrangler prints (usually `http://127.0.0.1:8788`).
 

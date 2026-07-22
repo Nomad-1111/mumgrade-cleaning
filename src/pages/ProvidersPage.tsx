@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  SuburbPicker,
+  suburbNameFromValue,
+} from '../components/SuburbPicker'
 import { api, type Provider } from '../lib/api'
 
 export function ProvidersPage() {
@@ -10,6 +14,11 @@ export function ProvidersPage() {
   const [providers, setProviders] = useState<Provider[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [reloadToken, setReloadToken] = useState(0)
+
+  useEffect(() => {
+    setSuburb(suburbFilter)
+  }, [suburbFilter])
 
   useEffect(() => {
     let cancelled = false
@@ -18,13 +27,26 @@ export function ProvidersPage() {
       setLoading(true)
       setError('')
       try {
-        const data = await api.listProviders(suburbFilter || undefined)
+        const data = await api.listProviders(
+          suburbFilter ? suburbNameFromValue(suburbFilter) : undefined,
+        )
         if (!cancelled) setProviders(data.providers)
       } catch (err) {
         if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : 'Failed to load providers',
-          )
+          const message =
+            err instanceof Error ? err.message : 'Failed to load providers'
+          if (
+            message.includes('Failed to fetch') ||
+            message.includes('502') ||
+            message.includes('ECONNREFUSED')
+          ) {
+            setError(
+              'API is not running. Keep `npm run dev` open, and in another terminal run `npm run dev:api` (or use `npm run dev:full`).',
+            )
+          } else {
+            setError(message)
+          }
+          setProviders([])
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -35,7 +57,7 @@ export function ProvidersPage() {
     return () => {
       cancelled = true
     }
-  }, [suburbFilter])
+  }, [suburbFilter, reloadToken])
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
@@ -57,11 +79,13 @@ export function ProvidersPage() {
           )
         }}
       >
-        <input
+        <SuburbPicker
+          id="providers-suburb"
+          className="flex-1"
           value={suburb}
-          onChange={(e) => setSuburb(e.target.value)}
-          placeholder="Suburb"
-          className="field flex-1"
+          onChange={setSuburb}
+          placeholder="Start typing a suburb"
+          aria-label="Suburb"
         />
         <button
           type="submit"
@@ -71,15 +95,40 @@ export function ProvidersPage() {
         </button>
       </form>
 
-      {loading && <p className="mt-10 text-charcoal/60">Loading providers…</p>}
-      {error && (
-        <p className="mt-10 max-w-xl text-sm text-olive">
-          {error}. Start the API with <code>npm run db:migrate</code> and{' '}
-          <code>npm run dev:cf</code>.
+      {suburbFilter && (
+        <p className="mt-4 text-sm text-charcoal/60">
+          Showing results for{' '}
+          <span className="font-medium text-charcoal">{suburbFilter}</span>
+          {' · '}
+          <button
+            type="button"
+            className="font-medium text-sage hover:text-olive"
+            onClick={() => {
+              setSuburb('')
+              navigate('/providers')
+            }}
+          >
+            Clear filter
+          </button>
         </p>
       )}
 
-      {!loading && !error && (
+      {loading && <p className="mt-10 text-charcoal/60">Loading providers…</p>}
+
+      {error && (
+        <div className="mt-10 max-w-xl rounded-md border border-sand bg-sand/40 px-4 py-3 text-sm text-olive">
+          <p className="break-words">{error}</p>
+          <button
+            type="button"
+            className="mt-3 font-semibold text-sage hover:text-olive"
+            onClick={() => setReloadToken((n) => n + 1)}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && providers.length > 0 && (
         <ul className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {providers.map((provider) => (
             <li key={provider.id} className="border-b border-sand pb-6">

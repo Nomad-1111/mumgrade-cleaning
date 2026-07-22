@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Select } from '../components/Select'
+import { SuburbPicker } from '../components/SuburbPicker'
 import { api, SERVICE_TYPES } from '../lib/api'
 
 const steps = ['Service', 'Details', 'Contact'] as const
@@ -99,12 +100,13 @@ export function PostJobPage() {
               />
             </Field>
             <Field label="Suburb">
-              <input
+              <SuburbPicker
+                id="suburb"
                 required
                 value={form.suburb}
-                onChange={(e) => update('suburb', e.target.value)}
-                className="field"
-                placeholder="e.g. Bondi"
+                onChange={(value) => update('suburb', value)}
+                placeholder="Start typing a suburb"
+                aria-label="Suburb"
               />
             </Field>
           </>

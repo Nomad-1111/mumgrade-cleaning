@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Select } from '../components/Select'
+import { SuburbPicker } from '../components/SuburbPicker'
 import { SERVICE_TYPES } from '../lib/api'
 
 const categories = [
@@ -96,12 +97,13 @@ export function HomePage() {
             <label className="sr-only" htmlFor="suburb">
               Suburb
             </label>
-            <input
+            <SuburbPicker
               id="suburb"
+              className="flex-1"
               value={suburb}
-              onChange={(e) => setSuburb(e.target.value)}
+              onChange={setSuburb}
               placeholder="Suburb"
-              className="field flex-1 placeholder:text-charcoal/40"
+              aria-label="Suburb"
             />
             <button
               type="submit"
