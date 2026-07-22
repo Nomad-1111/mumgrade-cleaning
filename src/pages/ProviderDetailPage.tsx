@@ -42,7 +42,10 @@ export function ProviderDetailPage() {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
         <p className="text-olive">{error || 'Provider not found'}</p>
-        <Link to="/providers" className="mt-4 inline-block text-sage hover:text-olive">
+        <Link
+          to="/providers"
+          className="mt-4 inline-block text-sage hover:text-olive"
+        >
           Back to providers
         </Link>
       </div>
@@ -68,25 +71,48 @@ export function ProviderDetailPage() {
         )}
       </div>
       <p className="mt-2 text-charcoal/70">{provider.suburb}</p>
-      <p className="mt-8 text-base leading-relaxed text-charcoal/80">
-        {provider.bio}
-      </p>
-      <div className="mt-10 space-y-2 border-t border-sand pt-8 text-sm text-charcoal/70 break-words">
-        <p>
-          <span className="font-medium text-charcoal">Email:</span>{' '}
-          <a href={`mailto:${provider.email}`} className="hover:text-olive">
-            {provider.email}
-          </a>
+
+      <section className="mt-8">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sage">
+          About
+        </h2>
+        <p className="mt-3 whitespace-pre-wrap text-base leading-relaxed text-charcoal/80">
+          {provider.bio?.trim() || 'No bio provided yet.'}
         </p>
-        {provider.phone && (
-          <p>
-            <span className="font-medium text-charcoal">Phone:</span>{' '}
-            <a href={`tel:${provider.phone}`} className="hover:text-olive">
-              {provider.phone}
-            </a>
-          </p>
-        )}
-      </div>
+      </section>
+
+      <section className="mt-10 border-t border-sand pt-8">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sage">
+          Contact details
+        </h2>
+        <dl className="mt-4 space-y-3 text-sm text-charcoal/80 break-words">
+          <div>
+            <dt className="font-medium text-charcoal">Email</dt>
+            <dd className="mt-1">
+              <a href={`mailto:${provider.email}`} className="hover:text-olive">
+                {provider.email}
+              </a>
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium text-charcoal">Phone</dt>
+            <dd className="mt-1">
+              {provider.phone ? (
+                <a href={`tel:${provider.phone}`} className="hover:text-olive">
+                  {provider.phone}
+                </a>
+              ) : (
+                'Not provided'
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium text-charcoal">Suburb</dt>
+            <dd className="mt-1">{provider.suburb}</dd>
+          </div>
+        </dl>
+      </section>
+
       <Link
         to="/post-job"
         className="mt-10 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-sage px-5 text-base font-semibold text-white transition-colors hover:bg-olive sm:w-auto sm:text-sm"

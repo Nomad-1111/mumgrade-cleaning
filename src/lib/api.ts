@@ -44,13 +44,18 @@ export const SERVICE_TYPES = [
 export type ServiceType = (typeof SERVICE_TYPES)[number]
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  })
+  let response: Response
+  try {
+    response = await fetch(path, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers ?? {}),
+      },
+      ...init,
+    })
+  } catch {
+    throw new Error('Failed to fetch')
+  }
 
   const data = (await response.json().catch(() => ({}))) as T & {
     error?: string

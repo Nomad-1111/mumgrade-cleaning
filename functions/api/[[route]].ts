@@ -51,10 +51,15 @@ app.get('/providers', async (c) => {
   const suburb = c.req.query('suburb')
   let result
   if (suburb) {
+    const term = suburb.trim()
     result = await c.env.DB.prepare(
-      'SELECT * FROM providers WHERE lower(suburb) = lower(?) ORDER BY verified DESC, name ASC',
+      `SELECT * FROM providers
+       WHERE lower(suburb) = lower(?)
+          OR lower(suburb) LIKE lower(?) || ',%'
+          OR lower(?) LIKE lower(suburb) || ',%'
+       ORDER BY verified DESC, name ASC`,
     )
-      .bind(suburb)
+      .bind(term, term, term)
       .all<Provider>()
   } else {
     result = await c.env.DB.prepare(
@@ -83,6 +88,9 @@ app.post('/providers', async (c) => {
 
   if (!body.name?.trim() || !body.suburb?.trim() || !body.email?.trim()) {
     return c.json({ error: 'name, suburb, and email are required' }, 400)
+  }
+  if ((body.bio?.trim() ?? '').length < 20) {
+    return c.json({ error: 'bio must be at least 20 characters' }, 400)
   }
 
   const providerId = id('prov')
