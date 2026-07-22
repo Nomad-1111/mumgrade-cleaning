@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, type Provider } from '../lib/api'
+import { useAuth } from '../lib/auth'
 
 export function ProviderDetailPage() {
   const { id = '' } = useParams()
+  const { provider: sessionProvider } = useAuth()
   const [provider, setProvider] = useState<Provider | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const isOwnProfile = Boolean(
+    sessionProvider && provider && sessionProvider.id === provider.id,
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -69,6 +74,14 @@ export function ProviderDetailPage() {
             Verified
           </span>
         )}
+        {isOwnProfile && (
+          <Link
+            to="/account"
+            className="text-sm font-semibold text-sage hover:text-olive"
+          >
+            Edit profile
+          </Link>
+        )}
       </div>
       <p className="mt-2 text-charcoal/70">{provider.suburb}</p>
 
@@ -113,12 +126,14 @@ export function ProviderDetailPage() {
         </dl>
       </section>
 
-      <Link
-        to="/post-job"
-        className="mt-10 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-sage px-5 text-base font-semibold text-white transition-colors hover:bg-olive sm:w-auto sm:text-sm"
-      >
-        Request a quote
-      </Link>
+      {!isOwnProfile && (
+        <Link
+          to={`/post-job?provider=${encodeURIComponent(provider.id)}&suburb=${encodeURIComponent(provider.suburb)}`}
+          className="mt-10 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-sage px-5 text-base font-semibold text-white transition-colors hover:bg-olive sm:w-auto sm:text-sm"
+        >
+          Request a quote
+        </Link>
+      )}
     </div>
   )
 }

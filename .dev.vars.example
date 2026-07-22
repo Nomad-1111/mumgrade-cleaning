@@ -1,0 +1,7 @@
+# Copy to .dev.vars for local Wrangler (never commit secrets)
+ADMIN_SECRET=dev-admin-secret
+DEV_AUTH=1
+# Optional production email (Resend):
+# RESEND_API_KEY=
+# MAGIC_LINK_FROM=Mum Grade <noreply@yourdomain.com>
+# APP_ORIGIN=https://mumgrade-cleaning.pages.dev

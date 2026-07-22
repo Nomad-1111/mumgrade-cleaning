@@ -7,3 +7,7 @@ binding = "DB"
 database_name = "mumgrade-cleaning"
 database_id = "d4af78f6-7619-414c-be1a-52550395aaba"
 migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "TRAINING_VIDEOS"
+bucket_name = "mumgrade-training-videos"
