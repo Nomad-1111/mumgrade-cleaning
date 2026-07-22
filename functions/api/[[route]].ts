@@ -10,6 +10,10 @@ type Bindings = {
   RESEND_API_KEY?: string
   MAGIC_LINK_FROM?: string
   APP_ORIGIN?: string
+  /** e.g. https://yourteam.cloudflareaccess.com */
+  CF_ACCESS_TEAM_DOMAIN?: string
+  /** Access application Audience (AUD) tag */
+  CF_ACCESS_AUD?: string
 }
 
 type Provider = {
@@ -104,6 +108,140 @@ function adminSecret(env: Bindings) {
   return env.ADMIN_SECRET || (isDevAuth(env) ? 'dev-admin-secret' : '')
 }
 
+function accessConfigured(env: Bindings) {
+  return Boolean(env.CF_ACCESS_TEAM_DOMAIN?.trim() && env.CF_ACCESS_AUD?.trim())
+}
+
+function accessTeamOrigin(env: Bindings) {
+  const raw = env.CF_ACCESS_TEAM_DOMAIN?.trim() || ''
+  if (!raw) return ''
+  return raw.startsWith('http') ? raw.replace(/\/$/, '') : `https://${raw.replace(/\/$/, '')}`
+}
+
+type AccessCerts = {
+  keys: JsonWebKey[]
+  public_cert?: { kid?: string; cert?: string }[]
+}
+
+let cachedAccessCerts: { at: number; origin: string; keys: JsonWebKey[] } | null =
+  null
+
+async function getAccessKeys(teamOrigin: string) {
+  const now = Date.now()
+  if (
+    cachedAccessCerts &&
+    cachedAccessCerts.origin === teamOrigin &&
+    now - cachedAccessCerts.at < 60 * 60 * 1000
+  ) {
+    return cachedAccessCerts.keys
+  }
+  const res = await fetch(`${teamOrigin}/cdn-cgi/access/certs`)
+  if (!res.ok) throw new Error('Failed to fetch Access certs')
+  const data = (await res.json()) as AccessCerts
+  const keys = data.keys ?? []
+  cachedAccessCerts = { at: now, origin: teamOrigin, keys }
+  return keys
+}
+
+function b64urlToBytes(input: string) {
+  const padded = input.replace(/-/g, '+').replace(/_/g, '/')
+  const pad = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4))
+  const binary = atob(padded + pad)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+async function verifyAccessJwt(
+  token: string,
+  env: Bindings,
+): Promise<boolean> {
+  const teamOrigin = accessTeamOrigin(env)
+  const aud = env.CF_ACCESS_AUD?.trim()
+  if (!teamOrigin || !aud) return false
+
+  const parts = token.split('.')
+  if (parts.length !== 3) return false
+  const [headerB64, payloadB64, sigB64] = parts
+
+  let header: { alg?: string; kid?: string }
+  let payload: { aud?: string | string[]; exp?: number; iss?: string }
+  try {
+    header = JSON.parse(new TextDecoder().decode(b64urlToBytes(headerB64)))
+    payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(payloadB64)))
+  } catch {
+    return false
+  }
+
+  if (header.alg !== 'RS256') return false
+  if (typeof payload.exp === 'number' && payload.exp * 1000 < Date.now()) {
+    return false
+  }
+
+  const audience = payload.aud
+  const audOk = Array.isArray(audience)
+    ? audience.includes(aud)
+    : audience === aud
+  if (!audOk) return false
+
+  if (payload.iss && !payload.iss.startsWith(teamOrigin)) return false
+
+  const keys = await getAccessKeys(teamOrigin)
+  const jwk =
+    (header.kid
+      ? keys.find((k) => (k as JsonWebKey & { kid?: string }).kid === header.kid)
+      : undefined) || keys[0]
+  if (!jwk) return false
+
+  const key = await crypto.subtle.importKey(
+    'jwk',
+    jwk,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['verify'],
+  )
+
+  const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`)
+  const signature = b64urlToBytes(sigB64)
+  return crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, signature, data)
+}
+
+async function hasValidAccessJwt(
+  c: Context<{ Bindings: Bindings }>,
+): Promise<boolean> {
+  if (!accessConfigured(c.env)) return false
+  const token =
+    c.req.header('cf-access-jwt-assertion') ||
+    getCookie(c, 'CF_Authorization') ||
+    ''
+  if (!token) return false
+  try {
+    return await verifyAccessJwt(token, c.env)
+  } catch {
+    return false
+  }
+}
+
+function hasValidAdminSecret(c: Context<{ Bindings: Bindings }>) {
+  const secret = adminSecret(c.env)
+  if (!secret) return false
+  const header =
+    c.req.header('x-admin-secret') ||
+    c.req.header('authorization')?.replace(/^Bearer\s+/i, '')
+  return Boolean(header && header === secret)
+}
+
+/**
+ * Production: Cloudflare Access JWT (when CF_ACCESS_* is set).
+ * Local/dev: ADMIN_SECRET (or Access JWT if you test with Access).
+ */
+async function requireAdmin(c: Context<{ Bindings: Bindings }>) {
+  if (accessConfigured(c.env)) {
+    return hasValidAccessJwt(c)
+  }
+  return hasValidAdminSecret(c)
+}
+
 async function sha256(value: string) {
   const data = new TextEncoder().encode(value)
   const digest = await crypto.subtle.digest('SHA-256', data)
@@ -115,15 +253,6 @@ async function sha256(value: string) {
 function randomToken() {
   const bytes = crypto.getRandomValues(new Uint8Array(32))
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-function requireAdmin(c: Context<{ Bindings: Bindings }>) {
-  const secret = adminSecret(c.env)
-  if (!secret) return false
-  const header =
-    c.req.header('x-admin-secret') ||
-    c.req.header('authorization')?.replace(/^Bearer\s+/i, '')
-  return Boolean(header && header === secret)
 }
 
 async function getSessionProvider(c: Context<{ Bindings: Bindings }>) {
@@ -146,6 +275,7 @@ app.get('/health', (c) =>
     service: 'mumgrade-cleaning',
     r2: Boolean(c.env.TRAINING_VIDEOS),
     devAuth: isDevAuth(c.env),
+    accessAuth: accessConfigured(c.env),
   }),
 )
 
@@ -847,7 +977,7 @@ app.get('/training/:id/media', async (c) => {
 /* ---------------- Admin training ---------------- */
 
 app.get('/admin/training', async (c) => {
-  if (!requireAdmin(c)) return c.json({ error: 'Unauthorized' }, 401)
+  if (!(await requireAdmin(c))) return c.json({ error: 'Unauthorized' }, 401)
   const result = await c.env.DB.prepare(
     `SELECT * FROM training_videos ORDER BY created_at DESC`,
   ).all<TrainingVideo>()
@@ -855,7 +985,7 @@ app.get('/admin/training', async (c) => {
 })
 
 app.post('/admin/training', async (c) => {
-  if (!requireAdmin(c)) return c.json({ error: 'Unauthorized' }, 401)
+  if (!(await requireAdmin(c))) return c.json({ error: 'Unauthorized' }, 401)
   if (!c.env.TRAINING_VIDEOS) {
     return c.json({ error: 'R2 bucket TRAINING_VIDEOS is not bound' }, 503)
   }
@@ -907,7 +1037,7 @@ app.post('/admin/training', async (c) => {
 })
 
 app.patch('/admin/training/:id', async (c) => {
-  if (!requireAdmin(c)) return c.json({ error: 'Unauthorized' }, 401)
+  if (!(await requireAdmin(c))) return c.json({ error: 'Unauthorized' }, 401)
   const body = await c.req.json<{
     title?: string
     description?: string
@@ -948,7 +1078,7 @@ app.patch('/admin/training/:id', async (c) => {
 })
 
 app.delete('/admin/training/:id', async (c) => {
-  if (!requireAdmin(c)) return c.json({ error: 'Unauthorized' }, 401)
+  if (!(await requireAdmin(c))) return c.json({ error: 'Unauthorized' }, 401)
   const existing = await c.env.DB.prepare(
     'SELECT * FROM training_videos WHERE id = ?',
   )

@@ -5,3 +5,7 @@ DEV_AUTH=1
 # RESEND_API_KEY=
 # MAGIC_LINK_FROM=Mum Grade <noreply@yourdomain.com>
 # APP_ORIGIN=https://mumgrade-cleaning.pages.dev
+#
+# Cloudflare Access (production admin). Leave unset locally to use ADMIN_SECRET.
+# CF_ACCESS_TEAM_DOMAIN=https://yourteam.cloudflareaccess.com
+# CF_ACCESS_AUD=paste-application-audience-tag-here

@@ -43,12 +43,30 @@ npm run dev:full
 
 ### Training videos (owner + providers)
 
-1. **Owner upload:** open `/admin/training`, unlock with `ADMIN_SECRET` (local default `dev-admin-secret`), upload a video to R2.
+1. **Owner upload:** open `/admin/training`.
+   - **Production:** Cloudflare Access (email OTP) on `/admin*` + `/api/admin*`, then the upload UI.
+   - **Local:** unlock with `ADMIN_SECRET` (default `dev-admin-secret`).
 2. **Provider access:** join at `/join` (or use a seeded provider email), then `/login` → magic link (shown in the UI when `DEV_AUTH=1` / no Resend key) → `/training`.
+
+### Cloudflare Access (admin)
+
+Do **not** enable Access on the whole Pages project (that locks the public site). Create **path-scoped** apps:
+
+1. Zero Trust → **Access** → **Applications** → Self-hosted  
+2. Protect **`yoursite/admin*`** and **`yoursite/api/admin*`** (two hostnames/paths, or one app with both paths)  
+3. Policy: Allow → your email(s); identity: One-time PIN or Google  
+4. Copy the application **AUD** tag and team domain (`https://<team>.cloudflareaccess.com`)  
+5. Set Pages env vars:
+   - `CF_ACCESS_TEAM_DOMAIN`
+   - `CF_ACCESS_AUD`  
+6. Redeploy. `/api/health` should show `"accessAuth": true`.
+
+When those vars are set, admin APIs accept a valid Access JWT only (not the shared secret).
 
 Production secrets (Pages → Settings → Environment variables):
 
-- `ADMIN_SECRET`
+- `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` (admin)
+- Optional local/break-glass: `ADMIN_SECRET` (ignored for API auth when Access env is set)
 - Optional: `RESEND_API_KEY`, `MAGIC_LINK_FROM`, `APP_ORIGIN`
 - Bind R2 bucket as `TRAINING_VIDEOS` (see `wrangler.toml`)
 
@@ -74,4 +92,4 @@ npx wrangler r2 bucket create mumgrade-training-videos
 | GET | `/api/auth/me` | Current provider session |
 | GET | `/api/training` | Published videos (auth required) |
 | GET | `/api/training/:id/media` | Stream video from R2 (auth required) |
-| GET/POST/PATCH/DELETE | `/api/admin/training` | Owner library (`X-Admin-Secret`) |
+| GET/POST/PATCH/DELETE | `/api/admin/training` | Owner library (Access JWT or local `X-Admin-Secret`) |
