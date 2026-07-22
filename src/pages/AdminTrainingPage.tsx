@@ -8,11 +8,11 @@ import {
 
 export function AdminTrainingPage() {
   const [secret, setSecret] = useState(getStoredAdminSecret())
-  const [unlocked, setUnlocked] = useState(Boolean(getStoredAdminSecret()))
+  const [unlocked, setUnlocked] = useState(false)
   const [videos, setVideos] = useState<TrainingVideo[]>([])
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState({
     title: '',
@@ -37,7 +37,7 @@ export function AdminTrainingPage() {
   }
 
   useEffect(() => {
-    if (getStoredAdminSecret()) void loadVideos()
+    void loadVideos()
   }, [])
 
   function unlock(event: FormEvent) {
@@ -94,6 +94,14 @@ export function AdminTrainingPage() {
     }
   }
 
+  if (loading && !unlocked) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
+        <p className="text-charcoal/60">Checking admin access…</p>
+      </div>
+    )
+  }
+
   if (!unlocked) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
@@ -101,7 +109,8 @@ export function AdminTrainingPage() {
           Admin training
         </h1>
         <p className="mt-3 text-sm text-charcoal/70">
-          Enter the Mum Grade admin secret to upload provider training videos.
+          Production uses Cloudflare Access (email login). Locally, enter the
+          admin secret to unlock uploads.
         </p>
         <form onSubmit={unlock} className="mt-8 space-y-4">
           <label className="block">
@@ -125,8 +134,9 @@ export function AdminTrainingPage() {
           </button>
         </form>
         <p className="mt-6 text-xs text-charcoal/50">
-          Local default: <code>dev-admin-secret</code> (see{' '}
-          <code>.dev.vars.example</code>).
+          Local default: <code>dev-admin-secret</code>. In production, protect{' '}
+          <code>/admin</code> and <code>/api/admin</code> with Cloudflare Access
+          and set <code>CF_ACCESS_TEAM_DOMAIN</code> + <code>CF_ACCESS_AUD</code>.
         </p>
       </div>
     )
