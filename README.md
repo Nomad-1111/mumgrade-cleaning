@@ -1,8 +1,8 @@
 # Mum Grade Cleaning
 
-Hipages-style cleaning marketplace: post a job, compare quotes, browse local providers.
+Hipages-style cleaning marketplace: post a job, compare quotes, browse local providers, and (for joined providers) access training videos.
 
-Hosted on **Cloudflare Pages** with **Pages Functions (Hono)** and **D1**.
+Hosted on **Cloudflare Pages** with **Pages Functions (Hono)**, **D1**, and **R2**.
 
 ## Stack
 
@@ -10,6 +10,8 @@ Hosted on **Cloudflare Pages** with **Pages Functions (Hono)** and **D1**.
 - React Router
 - Cloudflare Pages Functions + Hono (`/api/*`)
 - Cloudflare D1 (SQLite)
+- Cloudflare R2 (training video storage)
+- Provider magic-link auth (session cookie)
 
 ## Brand palette
 
@@ -28,59 +30,48 @@ Suburb dataset: `public/data/au-suburbs.json` (~18k AU localities)
 ## Local setup
 
 ```bash
+cp .dev.vars.example .dev.vars   # ADMIN_SECRET + DEV_AUTH
 npm install
 npm run db:migrate
 npm run build
 npm run dev:full
 ```
 
-- `npm run dev:full` — **recommended**: Vite hot reload (UI) + Wrangler API/D1 on port `8788`.
-- `npm run dev` — Vite UI only (Find cleaners / Join / Post job need the API).
-- `npm run dev:api` — Wrangler API only (run beside `npm run dev` if you prefer two terminals).
-- `npm run dev:cf` — full Pages preview from `dist` (no Vite HMR).
-- `npm run db:migrate` — apply D1 migrations locally (includes demo seed providers).
+- `npm run dev:full` — **recommended**: Vite hot reload (UI) + Wrangler API/D1/R2 on port `8788`.
+- `npm run dev` / `npm run dev:api` — split terminals if preferred.
+- `npm run db:migrate` — apply D1 migrations (includes demo providers).
 
-Open the URL Wrangler prints (usually `http://127.0.0.1:8788`).
+### Training videos (owner + providers)
 
-### Demo data
+1. **Owner upload:** open `/admin/training`, unlock with `ADMIN_SECRET` (local default `dev-admin-secret`), upload a video to R2.
+2. **Provider access:** join at `/join` (or use a seeded provider email), then `/login` → magic link (shown in the UI when `DEV_AUTH=1` / no Resend key) → `/training`.
 
-After migrate you should see seeded providers (Bondi, Newtown, Manly) and a sample job at `/jobs/job_demo_1`.
+Production secrets (Pages → Settings → Environment variables):
+
+- `ADMIN_SECRET`
+- Optional: `RESEND_API_KEY`, `MAGIC_LINK_FROM`, `APP_ORIGIN`
+- Bind R2 bucket as `TRAINING_VIDEOS` (see `wrangler.toml`)
+
+Create the R2 bucket once:
+
+```bash
+npx wrangler r2 bucket create mumgrade-training-videos
+```
 
 ## Deploy to Cloudflare Pages
 
-1. Create a D1 database:
+1. Ensure D1 + R2 bindings match `wrangler.toml`.
+2. `npm run db:migrate:remote`
+3. Set secrets above.
+4. `npm run deploy` (or Git-connected Pages).
 
-```bash
-npx wrangler d1 create mumgrade-cleaning
-```
-
-2. Put the returned `database_id` into `wrangler.toml`.
-
-3. Apply migrations remotely:
-
-```bash
-npm run db:migrate:remote
-```
-
-4. Deploy:
-
-```bash
-npm run deploy
-```
-
-Or connect the GitHub repo in the Cloudflare dashboard (build command `npm run build`, output `dist`). Bind the D1 database as `DB` in the Pages project settings.
-
-## API
+## API (selected)
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/health` | Health check |
-| GET | `/api/providers` | List providers (`?suburb=`) |
-| GET | `/api/providers/:id` | Provider detail |
-| POST | `/api/providers` | Create provider |
-| POST | `/api/jobs` | Create job |
-| GET | `/api/jobs/:id` | Job detail |
-| GET | `/api/jobs/:id/quotes` | Quotes for job |
-| POST | `/api/jobs/:id/quotes` | Add quote |
-
-Auth is deferred for this init — contact details are stored on job/provider rows.
+| POST | `/api/auth/magic-link` | Email a provider login link |
+| POST | `/api/auth/verify` | Exchange token for session cookie |
+| GET | `/api/auth/me` | Current provider session |
+| GET | `/api/training` | Published videos (auth required) |
+| GET | `/api/training/:id/media` | Stream video from R2 (auth required) |
+| GET/POST/PATCH/DELETE | `/api/admin/training` | Owner library (`X-Admin-Secret`) |

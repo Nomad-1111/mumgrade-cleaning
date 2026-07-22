@@ -12,6 +12,7 @@ export function PostJobPage() {
   const [step, setStep] = useState(0)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const invitedProviderId = searchParams.get('provider')?.trim() || undefined
   const [form, setForm] = useState({
     service_type: searchParams.get('service') ?? '',
     suburb: searchParams.get('suburb') ?? '',
@@ -41,7 +42,10 @@ export function PostJobPage() {
     setSubmitting(true)
     setError('')
     try {
-      const { job } = await api.createJob(form)
+      const { job } = await api.createJob({
+        ...form,
+        ...(invitedProviderId ? { invited_provider_id: invitedProviderId } : {}),
+      })
       navigate(`/jobs/${job.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create job')
@@ -59,8 +63,9 @@ export function PostJobPage() {
         Tell us about your clean
       </h1>
       <p className="mt-3 text-sm text-charcoal/70 sm:text-base">
-        Local cleaners will respond with quotes. No account required for this
-        demo.
+        {invitedProviderId
+          ? 'This request will be sent directly to the cleaner you selected, and may also appear for others in the area.'
+          : 'Local cleaners will respond with quotes. No account required for this demo.'}
       </p>
 
       <ol className="mt-8 flex gap-2 sm:gap-3">
