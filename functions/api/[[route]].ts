@@ -25,6 +25,9 @@ type Provider = {
   phone: string
   verified: number
   created_at: string
+  status?: string
+  notes?: string
+  plan?: string
 }
 
 type Job = {
@@ -62,13 +65,15 @@ type Booking = {
   created_at: string
 }
 
-type Quote = {
+type Invoice = {
   id: string
-  job_id: string
   provider_id: string
   amount_cents: number
-  message: string
+  currency: string
   status: string
+  description: string
+  due_at: string | null
+  paid_at: string | null
   created_at: string
   provider_name?: string
 }
@@ -262,7 +267,9 @@ async function getSessionProvider(c: Context<{ Bindings: Bindings }>) {
   const row = await c.env.DB.prepare(
     `SELECT p.* FROM provider_sessions s
      JOIN providers p ON p.id = s.provider_id
-     WHERE s.token_hash = ? AND s.expires_at > datetime('now')`,
+     WHERE s.token_hash = ?
+       AND s.expires_at > datetime('now')
+       AND coalesce(p.status, 'active') = 'active'`,
   )
     .bind(tokenHash)
     .first<Provider>()
@@ -286,23 +293,31 @@ app.get('/providers', async (c) => {
     const term = suburb.trim()
     result = await c.env.DB.prepare(
       `SELECT * FROM providers
-       WHERE lower(suburb) = lower(?)
-          OR lower(suburb) LIKE lower(?) || ',%'
-          OR lower(?) LIKE lower(suburb) || ',%'
+       WHERE coalesce(status, 'active') = 'active'
+         AND (
+           lower(suburb) = lower(?)
+           OR lower(suburb) LIKE lower(?) || ',%'
+           OR lower(?) LIKE lower(suburb) || ',%'
+         )
        ORDER BY verified DESC, name ASC`,
     )
       .bind(term, term, term)
       .all<Provider>()
   } else {
     result = await c.env.DB.prepare(
-      'SELECT * FROM providers ORDER BY verified DESC, name ASC',
+      `SELECT * FROM providers
+       WHERE coalesce(status, 'active') = 'active'
+       ORDER BY verified DESC, name ASC`,
     ).all<Provider>()
   }
   return c.json({ providers: result.results ?? [] })
 })
 
 app.get('/providers/:id', async (c) => {
-  const provider = await c.env.DB.prepare('SELECT * FROM providers WHERE id = ?')
+  const provider = await c.env.DB.prepare(
+    `SELECT * FROM providers
+     WHERE id = ? AND coalesce(status, 'active') = 'active'`,
+  )
     .bind(c.req.param('id'))
     .first<Provider>()
   if (!provider) return c.json({ error: 'Provider not found' }, 404)
@@ -820,6 +835,16 @@ app.post('/auth/magic-link', async (c) => {
     return c.json({ ok: true, message: 'If that email is registered, a login link is on its way.' })
   }
 
+  if ((provider.status || 'active') === 'suspended') {
+    if (isDevAuth(c.env)) {
+      return c.json({
+        ok: false,
+        error: 'This provider account is suspended.',
+      }, 403)
+    }
+    return c.json({ ok: true, message: 'If that email is registered, a login link is on its way.' })
+  }
+
   const token = randomToken()
   const tokenHash = await sha256(token)
   const linkId = id('ml')
@@ -884,6 +909,9 @@ app.post('/auth/verify', async (c) => {
     .bind(link.email)
     .first<Provider>()
   if (!provider) return c.json({ error: 'Provider not found' }, 404)
+  if ((provider.status || 'active') === 'suspended') {
+    return c.json({ error: 'This provider account is suspended' }, 403)
+  }
 
   await c.env.DB.prepare(
     `UPDATE magic_links SET used_at = datetime('now') WHERE id = ?`,
@@ -972,6 +1000,334 @@ app.get('/training/:id/media', async (c) => {
   object.writeHttpMetadata(headers)
 
   return new Response(object.body, { headers })
+})
+
+/* ---------------- Admin console ---------------- */
+
+app.get('/admin/overview', async (c) => {
+  if (!(await requireAdmin(c))) return c.json({ error: 'Unauthorized' }, 401)
+
+  const providersTotal = await c.env.DB.prepare(
+    'SELECT count(*) AS n FROM providers',
+  ).first<{ n: number }>()
+  const providersActive = await c.env.DB.prepare(
+    `SELECT count(*) AS n FROM providers WHERE coalesce(status, 'active') = 'active'`,
+  ).first<{ n: number }>()
+  const providersVerified = await c.env.DB.prepare(
+    `SELECT count(*) AS n FROM providers
+     WHERE verified = 1 AND coalesce(status, 'active') = 'active'`,
+  ).first<{ n: number }>()
+  const jobsOpen = await c.env.DB.prepare(
+    `SELECT count(*) AS n FROM jobs WHERE status = 'open'`,
+  ).first<{ n: number }>()
+  const videos = await c.env.DB.prepare(
+    'SELECT count(*) AS n FROM training_videos',
+  ).first<{ n: number }>()
+  const invoicesUnpaid = await c.env.DB.prepare(
+    `SELECT count(*) AS n FROM invoices WHERE status IN ('draft', 'sent')`,
+  ).first<{ n: number }>()
+
+  const recentProviders = await c.env.DB.prepare(
+    `SELECT id, name, email, suburb, status, verified, created_at
+     FROM providers ORDER BY created_at DESC LIMIT 5`,
+  ).all<Provider>()
+
+  const recentInvoices = await c.env.DB.prepare(
+    `SELECT i.*, p.name AS provider_name
+     FROM invoices i
+     JOIN providers p ON p.id = i.provider_id
+     ORDER BY i.created_at DESC LIMIT 5`,
+  ).all<Invoice>()
+
+  return c.json({
+    stats: {
+      providersTotal: providersTotal?.n ?? 0,
+      providersActive: providersActive?.n ?? 0,
+      providersVerified: providersVerified?.n ?? 0,
+      jobsOpen: jobsOpen?.n ?? 0,
+      videos: videos?.n ?? 0,
+      invoicesUnpaid: invoicesUnpaid?.n ?? 0,
+    },
+    recentProviders: recentProviders.results ?? [],
+    recentInvoices: recentInvoices.results ?? [],
+  })
+})
+
+app.get('/admin/providers', async (c) => {
+  if (!(await requireAdmin(c))) return c.json({ error: 'Unauthorized' }, 401)
+  const q = c.req.query('q')?.trim()
+  const status = c.req.query('status')?.trim()
+
+  let sql = 'SELECT * FROM providers WHERE 1=1'
+  const binds: string[] = []
+  if (status && status !== 'all') {
+    sql += ' AND coalesce(status, \'active\') = ?'
+    binds.push(status)
+  }
+  if (q) {
+    sql +=
+      ' AND (lower(name) LIKE ? OR lower(email) LIKE ? OR lower(suburb) LIKE ?)'
+    const like = `%${q.toLowerCase()}%`
+    binds.push(like, like, like)
+  }
+  sql += ' ORDER BY created_at DESC'
+
+  const stmt = c.env.DB.prepare(sql)
+  const result = binds.length
+    ? await stmt.bind(...binds).all<Provider>()
+    : await stmt.all<Provider>()
+
+  return c.json({ providers: result.results ?? [] })
+})
+
+app.get('/admin/providers/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.json({ error: 'Unauthorized' }, 401)
+  const provider = await c.env.DB.prepare('SELECT * FROM providers WHERE id = ?')
+    .bind(c.req.param('id'))
+    .first<Provider>()
+  if (!provider) return c.json({ error: 'Provider not found' }, 404)
+
+  const invoices = await c.env.DB.prepare(
+    `SELECT * FROM invoices WHERE provider_id = ? ORDER BY created_at DESC`,
+  )
+    .bind(provider.id)
+    .all<Invoice>()
+
+  return c.json({ provider, invoices: invoices.results ?? [] })
+})
+
+app.patch('/admin/providers/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.json({ error: 'Unauthorized' }, 401)
+  const existing = await c.env.DB.prepare('SELECT * FROM providers WHERE id = ?')
+    .bind(c.req.param('id'))
+    .first<Provider>()
+  if (!existing) return c.json({ error: 'Provider not found' }, 404)
+
+  const body = await c.req.json<{
+    name?: string
+    suburb?: string
+    bio?: string
+    email?: string
+    phone?: string
+    verified?: boolean | number
+    status?: string
+    notes?: string
+    plan?: string
+  }>()
+
+  const name = body.name?.trim() ?? existing.name
+  const suburb = body.suburb?.trim() ?? existing.suburb
+  const bio = body.bio !== undefined ? body.bio.trim() : existing.bio
+  const email = (body.email?.trim() ?? existing.email).toLowerCase()
+  const phone = body.phone !== undefined ? body.phone.trim() : existing.phone
+  const notes = body.notes !== undefined ? body.notes.trim() : existing.notes || ''
+  const plan = body.plan?.trim() || existing.plan || 'free'
+  const status =
+    body.status?.trim() || existing.status || 'active'
+  const verified =
+    body.verified === undefined
+      ? existing.verified
+      : body.verified === true || body.verified === 1
+        ? 1
+        : 0
+
+  if (status !== 'active' && status !== 'suspended') {
+    return c.json({ error: 'status must be active or suspended' }, 400)
+  }
+  if (plan !== 'free' && plan !== 'pro') {
+    return c.json({ error: 'plan must be free or pro' }, 400)
+  }
+
+  const emailOwner = await c.env.DB.prepare(
+    'SELECT id FROM providers WHERE lower(email) = lower(?) AND id != ?',
+  )
+    .bind(email, existing.id)
+    .first()
+  if (emailOwner) {
+    return c.json({ error: 'That email is already used by another provider' }, 409)
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE providers
+     SET name = ?, suburb = ?, bio = ?, email = ?, phone = ?,
+         verified = ?, status = ?, notes = ?, plan = ?
+     WHERE id = ?`,
+  )
+    .bind(
+      name,
+      suburb,
+      bio,
+      email,
+      phone,
+      verified,
+      status,
+      notes,
+      plan,
+      existing.id,
+    )
+    .run()
+
+  if (status === 'suspended') {
+    await c.env.DB.prepare(
+      'DELETE FROM provider_sessions WHERE provider_id = ?',
+    )
+      .bind(existing.id)
+      .run()
+  }
+
+  const provider = await c.env.DB.prepare('SELECT * FROM providers WHERE id = ?')
+    .bind(existing.id)
+    .first<Provider>()
+
+  return c.json({ provider })
+})
+
+app.post('/admin/providers/:id/revoke-sessions', async (c) => {
+  if (!(await requireAdmin(c))) return c.json({ error: 'Unauthorized' }, 401)
+  const existing = await c.env.DB.prepare('SELECT id FROM providers WHERE id = ?')
+    .bind(c.req.param('id'))
+    .first()
+  if (!existing) return c.json({ error: 'Provider not found' }, 404)
+
+  await c.env.DB.prepare(
+    'DELETE FROM provider_sessions WHERE provider_id = ?',
+  )
+    .bind(c.req.param('id'))
+    .run()
+
+  return c.json({ ok: true })
+})
+
+app.get('/admin/invoices', async (c) => {
+  if (!(await requireAdmin(c))) return c.json({ error: 'Unauthorized' }, 401)
+  const status = c.req.query('status')?.trim()
+
+  let sql = `SELECT i.*, p.name AS provider_name
+     FROM invoices i
+     JOIN providers p ON p.id = i.provider_id`
+  const binds: string[] = []
+  if (status && status !== 'all') {
+    sql += ' WHERE i.status = ?'
+    binds.push(status)
+  }
+  sql += ' ORDER BY i.created_at DESC'
+
+  const stmt = c.env.DB.prepare(sql)
+  const result = binds.length
+    ? await stmt.bind(...binds).all<Invoice>()
+    : await stmt.all<Invoice>()
+
+  return c.json({ invoices: result.results ?? [] })
+})
+
+app.post('/admin/invoices', async (c) => {
+  if (!(await requireAdmin(c))) return c.json({ error: 'Unauthorized' }, 401)
+  const body = await c.req.json<{
+    provider_id?: string
+    amount_cents?: number
+    description?: string
+    due_at?: string
+    status?: string
+  }>()
+
+  if (!body.provider_id?.trim() || typeof body.amount_cents !== 'number') {
+    return c.json({ error: 'provider_id and amount_cents are required' }, 400)
+  }
+  if (body.amount_cents <= 0) {
+    return c.json({ error: 'amount_cents must be positive' }, 400)
+  }
+
+  const provider = await c.env.DB.prepare('SELECT id FROM providers WHERE id = ?')
+    .bind(body.provider_id.trim())
+    .first()
+  if (!provider) return c.json({ error: 'Provider not found' }, 404)
+
+  const status = body.status?.trim() || 'draft'
+  if (!['draft', 'sent', 'paid', 'void'].includes(status)) {
+    return c.json({ error: 'invalid status' }, 400)
+  }
+
+  const invoiceId = id('inv')
+  const paidAt = status === 'paid' ? new Date().toISOString() : null
+
+  await c.env.DB.prepare(
+    `INSERT INTO invoices (
+      id, provider_id, amount_cents, currency, status, description, due_at, paid_at
+    ) VALUES (?, ?, ?, 'AUD', ?, ?, ?, ?)`,
+  )
+    .bind(
+      invoiceId,
+      body.provider_id.trim(),
+      Math.round(body.amount_cents),
+      status,
+      body.description?.trim() ?? '',
+      body.due_at?.trim() || null,
+      paidAt,
+    )
+    .run()
+
+  const invoice = await c.env.DB.prepare(
+    `SELECT i.*, p.name AS provider_name
+     FROM invoices i
+     JOIN providers p ON p.id = i.provider_id
+     WHERE i.id = ?`,
+  )
+    .bind(invoiceId)
+    .first<Invoice>()
+
+  return c.json({ invoice }, 201)
+})
+
+app.patch('/admin/invoices/:id', async (c) => {
+  if (!(await requireAdmin(c))) return c.json({ error: 'Unauthorized' }, 401)
+  const existing = await c.env.DB.prepare('SELECT * FROM invoices WHERE id = ?')
+    .bind(c.req.param('id'))
+    .first<Invoice>()
+  if (!existing) return c.json({ error: 'Invoice not found' }, 404)
+
+  const body = await c.req.json<{
+    status?: string
+    description?: string
+    amount_cents?: number
+    due_at?: string | null
+  }>()
+
+  const status = body.status?.trim() || existing.status
+  if (!['draft', 'sent', 'paid', 'void'].includes(status)) {
+    return c.json({ error: 'invalid status' }, 400)
+  }
+
+  const description =
+    body.description !== undefined ? body.description.trim() : existing.description
+  const amount =
+    typeof body.amount_cents === 'number'
+      ? Math.round(body.amount_cents)
+      : existing.amount_cents
+  const dueAt =
+    body.due_at !== undefined ? body.due_at : existing.due_at
+
+  let paidAt = existing.paid_at
+  if (status === 'paid' && !paidAt) paidAt = new Date().toISOString()
+  if (status !== 'paid') paidAt = null
+
+  await c.env.DB.prepare(
+    `UPDATE invoices
+     SET status = ?, description = ?, amount_cents = ?, due_at = ?, paid_at = ?
+     WHERE id = ?`,
+  )
+    .bind(status, description, amount, dueAt, paidAt, existing.id)
+    .run()
+
+  const invoice = await c.env.DB.prepare(
+    `SELECT i.*, p.name AS provider_name
+     FROM invoices i
+     JOIN providers p ON p.id = i.provider_id
+     WHERE i.id = ?`,
+  )
+    .bind(existing.id)
+    .first<Invoice>()
+
+  return c.json({ invoice })
 })
 
 /* ---------------- Admin training ---------------- */

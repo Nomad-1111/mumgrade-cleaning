@@ -1,8 +1,13 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { AdminLayout } from './components/AdminLayout'
 import { Layout } from './components/Layout'
 import { AuthProvider } from './lib/auth'
 import { AccountPage } from './pages/AccountPage'
-import { AdminTrainingPage } from './pages/AdminTrainingPage'
+import { AdminBillingPage } from './pages/admin/AdminBillingPage'
+import { AdminOverviewPage } from './pages/admin/AdminOverviewPage'
+import { AdminProviderDetailPage } from './pages/admin/AdminProviderDetailPage'
+import { AdminProvidersPage } from './pages/admin/AdminProvidersPage'
+import { AdminTrainingPage } from './pages/admin/AdminTrainingPage'
 import { AuthVerifyPage } from './pages/AuthVerifyPage'
 import { ContactPage } from './pages/ContactPage'
 import { HomePage } from './pages/HomePage'
@@ -22,6 +27,14 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="admin" element={<AdminLayout />}>
+            <Route index element={<AdminOverviewPage />} />
+            <Route path="providers" element={<AdminProvidersPage />} />
+            <Route path="providers/:id" element={<AdminProviderDetailPage />} />
+            <Route path="training" element={<AdminTrainingPage />} />
+            <Route path="billing" element={<AdminBillingPage />} />
+          </Route>
+
           <Route element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="post-job" element={<PostJobPage />} />
@@ -35,7 +48,6 @@ export default function App() {
             <Route path="auth/verify" element={<AuthVerifyPage />} />
             <Route path="training" element={<TrainingPage />} />
             <Route path="account" element={<AccountPage />} />
-            <Route path="admin/training" element={<AdminTrainingPage />} />
             <Route path="how-it-works" element={<HowItWorksPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

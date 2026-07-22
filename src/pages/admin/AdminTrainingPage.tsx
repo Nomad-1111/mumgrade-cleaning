@@ -1,14 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import {
-  api,
-  getStoredAdminSecret,
-  setStoredAdminSecret,
-  type TrainingVideo,
-} from '../lib/api'
+import { api, type TrainingVideo } from '../../lib/api'
 
 export function AdminTrainingPage() {
-  const [secret, setSecret] = useState(getStoredAdminSecret())
-  const [unlocked, setUnlocked] = useState(false)
   const [videos, setVideos] = useState<TrainingVideo[]>([])
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -27,10 +20,8 @@ export function AdminTrainingPage() {
     try {
       const data = await api.adminListTraining()
       setVideos(data.videos)
-      setUnlocked(true)
     } catch (err) {
-      setUnlocked(false)
-      setError(err instanceof Error ? err.message : 'Unauthorized')
+      setError(err instanceof Error ? err.message : 'Failed to load videos')
     } finally {
       setLoading(false)
     }
@@ -39,12 +30,6 @@ export function AdminTrainingPage() {
   useEffect(() => {
     void loadVideos()
   }, [])
-
-  function unlock(event: FormEvent) {
-    event.preventDefault()
-    setStoredAdminSecret(secret.trim())
-    void loadVideos()
-  }
 
   async function onUpload(event: FormEvent) {
     event.preventDefault()
@@ -94,58 +79,10 @@ export function AdminTrainingPage() {
     }
   }
 
-  if (loading && !unlocked) {
-    return (
-      <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
-        <p className="text-charcoal/60">Checking admin access…</p>
-      </div>
-    )
-  }
-
-  if (!unlocked) {
-    return (
-      <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
-        <h1 className="font-display text-3xl font-semibold text-olive">
-          Admin training
-        </h1>
-        <p className="mt-3 text-sm text-charcoal/70">
-          Production uses Cloudflare Access (email login). Locally, enter the
-          admin secret to unlock uploads.
-        </p>
-        <form onSubmit={unlock} className="mt-8 space-y-4">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium">Admin secret</span>
-            <input
-              type="password"
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-              className="field"
-              autoComplete="current-password"
-            />
-          </label>
-          {error && (
-            <p className="text-sm text-olive break-words">{error}</p>
-          )}
-          <button
-            type="submit"
-            className="min-h-11 rounded-md bg-sage px-5 text-sm font-semibold text-white hover:bg-olive"
-          >
-            Unlock
-          </button>
-        </form>
-        <p className="mt-6 text-xs text-charcoal/50">
-          Local default: <code>dev-admin-secret</code>. In production, protect{' '}
-          <code>/admin</code> and <code>/api/admin</code> with Cloudflare Access
-          and set <code>CF_ACCESS_TEAM_DOMAIN</code> + <code>CF_ACCESS_AUD</code>.
-        </p>
-      </div>
-    )
-  }
-
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-16">
+    <div>
       <h1 className="font-display text-3xl font-semibold text-olive sm:text-4xl">
-        Training uploads
+        Training
       </h1>
       <p className="mt-3 text-sm text-charcoal/70">
         Upload videos to R2. Published videos appear in the provider training

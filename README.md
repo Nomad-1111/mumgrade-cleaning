@@ -43,8 +43,8 @@ npm run dev:full
 
 ### Training videos (owner + providers)
 
-1. **Owner upload:** open `/admin/training`.
-   - **Production:** Cloudflare Access (email OTP) on `/admin*` + `/api/admin*`, then the upload UI.
+1. **Owner console:** open `/admin` (Overview, Providers, Training, Billing).
+   - **Production:** Cloudflare Access (email OTP) on `/admin*` + `/api/admin*`.
    - **Local:** unlock with `ADMIN_SECRET` (default `dev-admin-secret`).
 2. **Provider access:** join at `/join` (or use a seeded provider email), then `/login` → magic link (shown in the UI when `DEV_AUTH=1` / no Resend key) → `/training`.
 
@@ -92,4 +92,7 @@ npx wrangler r2 bucket create mumgrade-training-videos
 | GET | `/api/auth/me` | Current provider session |
 | GET | `/api/training` | Published videos (auth required) |
 | GET | `/api/training/:id/media` | Stream video from R2 (auth required) |
+| GET | `/api/admin/overview` | Admin dashboard stats |
+| GET/PATCH | `/api/admin/providers` | List / update providers |
+| GET/POST/PATCH | `/api/admin/invoices` | Manual invoices |
 | GET/POST/PATCH/DELETE | `/api/admin/training` | Owner library (Access JWT or local `X-Admin-Secret`) |
